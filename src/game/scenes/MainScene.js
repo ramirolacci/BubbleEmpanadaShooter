@@ -31,16 +31,18 @@ export class MainScene extends Phaser.Scene {
     this.bubbles = this.physics.add.group();
     this.createInitialGrid();
     
+    // Guiding line (Zig-zag / Bounce)
+    this.graphics = this.add.graphics();
+    this.graphics.setDepth(1);
+    
     // Shooter setup
     this.shooter = this.add.container(540, 1800);
+    this.shooter.setDepth(2);
     this.createCanon();
+    
     this.nextEmpanada = this.add.image(0, -200, 'empanada_crunchy').setDisplaySize(55, 55);
     this.shooter.add([this.nextEmpanada]);
-
     this.mouthOffset = 200; // Distance from cannon pivot to mouth
-
-    // Guiding line
-    this.graphics = this.add.graphics();
     
     this.input.on('pointermove', (pointer) => {
       this.updateTrajectory(pointer);
@@ -58,6 +60,16 @@ export class MainScene extends Phaser.Scene {
     });
 
     this.input.setDefaultCursor('crosshair');
+
+    // Handle projectile hitting walls or roof
+    this.physics.world.on('worldbounds', (body) => {
+        if (body.gameObject && body.gameObject.isProjectile) {
+            // If it hits the roof (very low Y)
+            if (body.y <= 180) { // This corresponds to the top of our grid
+                this.snapToGrid(body.gameObject, null);
+            }
+        }
+    });
   }
 
   createCanon() {
@@ -112,8 +124,8 @@ export class MainScene extends Phaser.Scene {
     
     // Empanada Sprite on top
     const sprite = this.add.image(x, y, flavor).setDisplaySize(80, 80);
-    sprite.setDepth(2);
-    bg.setDepth(1);
+    sprite.setDepth(10); // High depth to stay visible
+    bg.setDepth(9);     // Circle just below sprite
     
     // We bind them or just use the background as the physics body
     bg.setData('flavor', flavor);
@@ -134,15 +146,100 @@ export class MainScene extends Phaser.Scene {
     const angle = Phaser.Math.Angle.Between(this.shooter.x, this.shooter.y - 50, pointer.x, pointer.y);
     this.shooter.rotation = angle + Math.PI/2;
 
-    this.graphics.lineStyle(8, 0x44FF44, 1.0); // Now bright neon green with full alpha for visibility
-    const length = 1200;
+    this.graphics.lineStyle(8, 0x44FF44, 1.0); 
     
-    const startX = this.shooter.x + Math.cos(angle) * this.mouthOffset;
-    const startY = this.shooter.y + Math.sin(angle) * this.mouthOffset;
-
+    let currentX = this.shooter.x + Math.cos(angle) * this.mouthOffset;
+    let currentY = this.shooter.y + Math.sin(angle) * this.mouthOffset;
+    let currentAngle = angle;
+    
     this.graphics.beginPath();
-    this.graphics.moveTo(startX, startY);
-    this.graphics.lineTo(startX + Math.cos(angle) * length, startY + Math.sin(angle) * length);
+    this.graphics.moveTo(currentX, currentY);
+
+    this.graphics.setDepth(0.5); // Behind the cannon
+
+    let remainingLength = 3000;
+    let bounces = 5;
+    const bubbleRadiusSq = (this.bubbleRadius * 0.8) ** 2; // slightly smaller hitbox for better visuals
+    
+    while (remainingLength > 10 && bounces >= 0) {
+        let dx = Math.cos(currentAngle);
+        let dy = Math.sin(currentAngle);
+        
+        let targetX = currentX + dx * remainingLength;
+        let targetY = currentY + dy * remainingLength;
+        
+        let hitWall = false;
+        let hitBubble = false;
+        let t = 1.0;
+        
+        // Check side walls
+        if (dx < 0 && targetX < 0) {
+            t = (0 - currentX) / (dx * remainingLength);
+            hitWall = true;
+        } else if (dx > 0 && targetX > 1080) {
+            t = (1080 - currentX) / (dx * remainingLength);
+            hitWall = true;
+        }
+        
+        // Check roof
+        if (dy < 0 && (currentY + dy * remainingLength * t) < 0) {
+            let tRoof = (0 - currentY) / (dy * remainingLength);
+            if (tRoof < t) {
+                t = tRoof;
+                hitWall = false;
+            }
+        }
+
+        // Check for bubble collisions along this segment
+        // This is a simple approximation: check each active bubble
+        this.bubbles.children.iterate((bubble) => {
+            if (!bubble || !bubble.active || hitBubble) return;
+            
+            // Check distance from segment to bubble center
+            const bx = bubble.x;
+            const by = bubble.y;
+            
+            // Vector from start of segment to bubble center
+            const v1x = bx - currentX;
+            const v1y = by - currentY;
+            
+            // Project v1 onto segment direction
+            const projection = v1x * dx + v1y * dy;
+            
+            if (projection > 0 && projection < remainingLength * t) {
+                // Find closest point on segment
+                const px = currentX + dx * projection;
+                const py = currentY + dy * projection;
+                
+                const distSq = (bx - px)**2 + (by - py)**2;
+                if (distSq < bubbleRadiusSq) {
+                    const bubbleT = projection / remainingLength;
+                    if (bubbleT < t) {
+                        t = bubbleT;
+                        hitBubble = true;
+                        hitWall = false;
+                    }
+                }
+            }
+        });
+
+        let segmentX = currentX + dx * remainingLength * t;
+        let segmentY = currentY + dy * remainingLength * t;
+        
+        this.graphics.lineTo(segmentX, segmentY);
+        
+        if (hitWall) {
+            currentAngle = Math.PI - currentAngle;
+            currentX = segmentX;
+            currentY = segmentY;
+            remainingLength *= (1 - t);
+            remainingLength -= 2; // tiny gap to avoid double trigger
+            bounces--;
+        } else {
+            break; 
+        }
+    }
+    
     this.graphics.strokePath();
   }
 
@@ -173,7 +270,7 @@ export class MainScene extends Phaser.Scene {
     this.remainingShots--;
     this.game.events.emit('UPDATE_SHOTS', this.remainingShots);
 
-    this.physics.add.collider(projectile, this.bubbles, (p, b) => {
+    this.physics.add.overlap(projectile, this.bubbles, (p, b) => {
       if (!p.active || !b.active) return;
       console.log('Projectile hit a bubble!');
       if (this.isFireActive) {
@@ -212,29 +309,23 @@ export class MainScene extends Phaser.Scene {
   }
 
   snapToGrid(projectile, hitBubble) {
+    // CAPTURE data BEFORE destroying the projectile
+    const flavor = projectile.getData('flavor');
     const x = projectile.x;
     const y = projectile.y;
     
-    // Only snap if we are above a certain Y threshold (top half of screen approximately)
-    // The grid is at the top. The shooter is at 1800.
-    if (y > 1500) {
-        console.log('Skipping snap: too low in screen', y);
-        return;
-    }
-
-    console.log('Snapping to grid at:', x, y);
-    
-    const flavor = projectile.getData('flavor');
-
-    // Destroy visual components
+    // Now safe to destroy visual components
     if (projectile.getData('sprite')) projectile.getData('sprite').destroy();
     projectile.destroy();
     
     this.shooterBubble = null;
     this.isShooting = false;
 
+    // Only snap if we are in the upper part where the grid lives
+    if (y > 1500) return;
+
     // Calculate row/col based on x,y
-    const row = Math.round((y - 100 - this.bubbleRadius) / (this.bubbleDiameter * 0.85));
+    const row = Math.round((y - 180 - this.bubbleRadius) / (this.bubbleDiameter * 0.85));
     const offset = (row % 2 !== 0) ? this.bubbleRadius : 0;
     const col = Math.round((x - 40 - this.bubbleRadius - offset) / this.bubbleDiameter);
 
