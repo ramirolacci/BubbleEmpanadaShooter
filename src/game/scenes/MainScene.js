@@ -14,13 +14,13 @@ export class MainScene extends Phaser.Scene {
     this.isFireActive = false;
     this.remainingShots = 30;
     
-    // Flavor colors mapping
+    // Flavor colors mapping - Using more distinct colors for contrast
     this.flavorColors = {
-      'empanada_crunchy': 0xE65100, // Crunchy (Dark Orange)
-      'empanada_burger': 0x4E342E,  // Big Burger (Brown)
-      'empanada_matambre': 0xC62828, // Matambre alapizza (Red)
-      'empanada_pork': 0xD4AF37,    // Mexican Pibil (Gold)
-      'empanada_fire': 0xFF5722     // Fire (Orange)
+      'empanada_crunchy': 0xFF5722, // Crunchy (Vibrant Orange)
+      'empanada_burger': 0x00E5FF,  // Big Burger (Neon Cyan)
+      'empanada_matambre': 0xE040FB, // Matambre alapizza (Bright Purple)
+      'empanada_pork': 0xFFD600,    // Mexican Pibil (Vibrant Yellow)
+      'empanada_fire': 0xFF1744     // Fire (Neon Red)
     };
   }
 
@@ -50,14 +50,6 @@ export class MainScene extends Phaser.Scene {
         this.shoot(pointer);
     });
 
-    // Score Text
-    this.scoreText = this.add.text(50, 50, 'PUNTOS: 0', {
-      fontSize: '48px',
-      fontFamily: 'Arial Black',
-      fill: '#D4AF37',
-      stroke: '#3E2723',
-      strokeThickness: 8
-    });
 
     // Events from React
     this.game.events.on('ACTIVATE_FIRE', () => {
@@ -77,13 +69,13 @@ export class MainScene extends Phaser.Scene {
     cannon.setOrigin(0.5, 0.75); // Adjusted pivot for the asset
     
     // "Mi Gusto" text below cannon
-    this.add.text(0, 80, 'MI GUSTO', {
+    const brandText = this.add.text(0, 80, 'MI GUSTO', {
         fontSize: '24px',
         color: '#D4AF37',
         fontStyle: 'bold'
     }).setOrigin(0.5);
-
-    this.shooter.add(cannon);
+    
+    this.shooter.add([cannon, brandText]);
   }
 
   createInitialGrid() {
@@ -94,7 +86,7 @@ export class MainScene extends Phaser.Scene {
       
       for (let col = 0; col < this.cols; col++) {
         const x = col * this.bubbleDiameter + this.bubbleRadius + offset + 40;
-        const y = row * (this.bubbleDiameter * 0.85) + this.bubbleRadius + 100;
+        const y = row * (this.bubbleDiameter * 0.85) + this.bubbleRadius + 180;
         
         const flavor = flavors[Math.floor(Math.random() * flavors.length)];
         const bubble = this.createBubbleAt(x, y, flavor, true);
@@ -142,7 +134,7 @@ export class MainScene extends Phaser.Scene {
     const angle = Phaser.Math.Angle.Between(this.shooter.x, this.shooter.y - 50, pointer.x, pointer.y);
     this.shooter.rotation = angle + Math.PI/2;
 
-    this.graphics.lineStyle(6, 0xD4AF37, 0.4);
+    this.graphics.lineStyle(8, 0x44FF44, 1.0); // Now bright neon green with full alpha for visibility
     const length = 1200;
     
     const startX = this.shooter.x + Math.cos(angle) * this.mouthOffset;
@@ -250,7 +242,7 @@ export class MainScene extends Phaser.Scene {
 
     // Place new bubble in grid
     const posX = col * this.bubbleDiameter + this.bubbleRadius + offset + 40;
-    const posY = row * (this.bubbleDiameter * 0.85) + this.bubbleRadius + 100;
+    const posY = row * (this.bubbleDiameter * 0.85) + this.bubbleRadius + 180;
     
     const newBubble = this.createBubbleAt(posX, posY, flavor);
     newBubble.setData('row', row);
@@ -327,7 +319,6 @@ export class MainScene extends Phaser.Scene {
         this.grid[r][c] = null;
       }
     });
-    this.scoreText.setText(`PUNTOS: ${this.score}`);
   }
 
   explodeEmpanada(x, y) {

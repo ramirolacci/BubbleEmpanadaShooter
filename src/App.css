@@ -32,7 +32,7 @@
   top: 0;
   left: 0;
   width: 100%;
-  padding: 20px;
+  padding: 15px 10px;
   box-sizing: border-box;
   pointer-events: none;
   font-family: 'Outfit', sans-serif;
@@ -41,14 +41,17 @@
 }
 
 .hud-header {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
   align-items: center;
+  width: 100%;
+  padding: 0 15px 0 55px; /* Pull trophy in (left) and keep level near edge (right) */
+  box-sizing: border-box;
 }
 
 .hud-stat {
   background: rgba(26, 10, 5, 0.85);
-  padding: 8px 16px;
+  padding: 8px 20px;
   border-radius: 50px;
   border: 1px solid rgba(212, 175, 55, 0.5);
   display: flex;
@@ -60,6 +63,19 @@
   white-space: nowrap;
   backdrop-filter: blur(4px);
   color: #D4AF37;
+  width: fit-content;
+}
+
+.hud-header > div:nth-child(1) {
+  justify-self: start;
+}
+
+.hud-header > div:nth-child(2) {
+  justify-self: center;
+}
+
+.hud-header > div:nth-child(3) {
+  justify-self: end;
 }
 
 .hud-stat span {
