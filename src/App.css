@@ -41,11 +41,11 @@
 }
 
 .hud-header {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
   width: 100%;
-  padding: 0 15px 0 55px; /* Pull trophy in (left) and keep level near edge (right) */
+  padding: 0 15px 0 55px;
   box-sizing: border-box;
 }
 
@@ -66,17 +66,6 @@
   width: fit-content;
 }
 
-.hud-header > div:nth-child(1) {
-  justify-self: start;
-}
-
-.hud-header > div:nth-child(2) {
-  justify-self: center;
-}
-
-.hud-header > div:nth-child(3) {
-  justify-self: end;
-}
 
 .hud-stat span {
   overflow: hidden;

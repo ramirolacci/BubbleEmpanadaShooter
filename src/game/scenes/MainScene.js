@@ -29,6 +29,7 @@ export class MainScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, 1080, 1920);
     this.physics.world.setBoundsCollision(true, true, true, false);
     this.bubbles = this.physics.add.group();
+    this.fallingBubbles = [];
     this.createInitialGrid();
     
     // Guiding line (Zig-zag / Bounce)
@@ -456,9 +457,16 @@ export class MainScene extends Phaser.Scene {
 
   dropBubble(bubble, r, c) {
     this.grid[r][c] = null;
+    this.bubbles.remove(bubble);
+    this.fallingBubbles.push(bubble);
+    bubble.body.setImmovable(false);
     this.physics.add.existing(bubble);
-    bubble.body.setVelocityY(800);
-    this.time.delayedCall(1000, () => bubble.destroy());
+    bubble.body.setVelocityY(1000); // 1000 is faster, feels better
+    
+    this.time.delayedCall(2500, () => {
+        if (bubble.getData('sprite')) bubble.getData('sprite').destroy();
+        if (bubble.active) bubble.destroy();
+    });
     
     // Check if game won
     this.time.delayedCall(1500, () => {
@@ -501,6 +509,16 @@ export class MainScene extends Phaser.Scene {
         child.updateSprite();
       }
     });
+
+    if (this.fallingBubbles) {
+      this.fallingBubbles.forEach(child => {
+        if (child && child.active && child.updateSprite) {
+          child.updateSprite();
+        }
+      });
+      // Filter out destroyed ones to prevent memory leaks
+      this.fallingBubbles = this.fallingBubbles.filter(child => child && child.active);
+    }
 
     if (this.shooterBubble && this.shooterBubble.active) {
         this.shooterBubble.updateSprite();

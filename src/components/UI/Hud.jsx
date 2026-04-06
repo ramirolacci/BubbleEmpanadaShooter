@@ -12,9 +12,6 @@ const Hud = ({ score, level, shots, onPowerUp }) => {
         <div className="hud-stat">
             <span>SHOTS: {shots}</span>
         </div>
-        <div className="hud-stat">
-          <span className="level-text">NIVEL {level}</span>
-        </div>
       </div>
       
       <div className="power-ups">
