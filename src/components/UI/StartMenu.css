@@ -174,3 +174,43 @@
   background-image: url('/empanadas/pollo.png');
   animation-delay: 1.5s;
 }
+
+/* Mobile responsive adjustments */
+@media screen and (max-width: 480px) {
+  .start-menu-content {
+    max-width: 90%;
+    padding: 25px 15px;
+    margin: 0 10px;
+  }
+
+  .menu-logo {
+    max-width: 180px;
+  }
+
+  .game-title {
+    font-size: 2.2rem;
+    letter-spacing: -1px;
+  }
+
+  .button-content {
+    padding: 15px 40px;
+    font-size: 1.4rem;
+    gap: 10px;
+  }
+
+  .button-content svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .flavors-line {
+    font-size: 0.75rem;
+    gap: 8px;
+    flex-wrap: wrap;
+    line-height: 1.5;
+  }
+
+  .menu-footer {
+    margin-top: 30px;
+  }
+}
