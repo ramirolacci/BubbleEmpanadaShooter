@@ -82,12 +82,7 @@ const Game = () => {
         <div className="game-over-overlay">
           <h2>{gameState.win ? '¡GANASTE!' : 'FIN DEL JUEGO'}</h2>
           <p>Tu puntuación: {gameState.score}</p>
-          {gameState.win && (
-            <div className="qr-container">
-              <p>Escanea para tu premio:</p>
-              <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=DESC_MIGUSTO_20" alt="QR Discount" />
-            </div>
-          )}
+
           <button onClick={restartGame}>VOLVER A JUGAR</button>
         </div>
       )}
