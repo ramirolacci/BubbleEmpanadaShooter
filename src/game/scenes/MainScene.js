@@ -28,6 +28,12 @@ export class MainScene extends Phaser.Scene {
     this.add.image(540, 960, 'background').setDisplaySize(1080, 1920);
     this.physics.world.setBounds(0, 0, 1080, 1920);
     this.physics.world.setBoundsCollision(true, true, true, false);
+    
+    // Static roof to prevent tunneling
+    this.roofGroup = this.physics.add.staticGroup();
+    const roofRect = this.add.rectangle(540, 140, 1080, 40, 0x000000, 0);
+    this.roofGroup.add(roofRect);
+    
     this.bubbles = this.physics.add.group();
     this.fallingBubbles = [];
     this.createInitialGrid();
@@ -61,16 +67,6 @@ export class MainScene extends Phaser.Scene {
     });
 
     this.input.setDefaultCursor('crosshair');
-
-    // Handle projectile hitting walls or roof
-    this.physics.world.on('worldbounds', (body) => {
-        if (body.gameObject && body.gameObject.isProjectile) {
-            // If it hits the roof (very low Y)
-            if (body.y <= 180) { // This corresponds to the top of our grid
-                this.snapToGrid(body.gameObject, null);
-            }
-        }
-    });
   }
 
   createCanon() {
@@ -98,7 +94,7 @@ export class MainScene extends Phaser.Scene {
       const offset = (row % 2 !== 0) ? this.bubbleRadius : 0;
       
       for (let col = 0; col < this.cols; col++) {
-        const x = col * this.bubbleDiameter + this.bubbleRadius + offset + 40;
+        const x = col * this.bubbleDiameter + this.bubbleRadius + offset + 15;
         const y = row * (this.bubbleDiameter * 0.85) + this.bubbleRadius + 180;
         
         const flavor = flavors[Math.floor(Math.random() * flavors.length)];
@@ -183,8 +179,8 @@ export class MainScene extends Phaser.Scene {
         }
         
         // Check roof
-        if (dy < 0 && (currentY + dy * remainingLength * t) < 0) {
-            let tRoof = (0 - currentY) / (dy * remainingLength);
+        if (dy < 0 && (currentY + dy * remainingLength * t) < 140) {
+            let tRoof = (140 - currentY) / (dy * remainingLength);
             if (tRoof < t) {
                 t = tRoof;
                 hitWall = false;
@@ -264,13 +260,14 @@ export class MainScene extends Phaser.Scene {
     projectile.body.setBounce(1, 1);
     
     // Adjusted speed for stability
-    const speed = 2400;
+    const speed = 1800; // Lowered from 2400 for better collision detection
     projectile.body.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed);
     console.log('Fired projectile:', flavor, 'Velocity:', projectile.body.velocity);
 
     this.remainingShots--;
     this.game.events.emit('UPDATE_SHOTS', this.remainingShots);
 
+    // Collision with grid bubbles
     this.physics.add.overlap(projectile, this.bubbles, (p, b) => {
       if (!p.active || !b.active) return;
       console.log('Projectile hit a bubble!');
@@ -279,6 +276,13 @@ export class MainScene extends Phaser.Scene {
       } else {
         this.snapToGrid(p, b);
       }
+    });
+
+    // Collision with roof (static body)
+    this.physics.add.collider(projectile, this.roofGroup, (p, r) => {
+        if (p.active) {
+            this.snapToGrid(p, null);
+        }
     });
 
     // Update next empanada
@@ -322,25 +326,52 @@ export class MainScene extends Phaser.Scene {
     this.shooterBubble = null;
     this.isShooting = false;
 
-    // Only snap if we are in the upper part where the grid lives
-    if (y > 1500) return;
-
     // Calculate row/col based on x,y
-    const row = Math.round((y - 180 - this.bubbleRadius) / (this.bubbleDiameter * 0.85));
-    const offset = (row % 2 !== 0) ? this.bubbleRadius : 0;
-    const col = Math.round((x - 40 - this.bubbleRadius - offset) / this.bubbleDiameter);
+    let row = Math.round((y - 180 - this.bubbleRadius) / (this.bubbleDiameter * 0.85));
+    if (row < 0) row = 0;
+    
+    let offset = (row % 2 !== 0) ? this.bubbleRadius : 0;
+    let col = Math.round((x - 15 - this.bubbleRadius - offset) / this.bubbleDiameter);
+    col = Phaser.Math.Clamp(col, 0, this.cols - 1);
 
-    if (row < 0 || col < 0 || col >= this.cols) return;
+    // If target slot is occupied, find nearest empty neighbor
+    if (this.getBubbleAt(row, col)) {
+        const neighbors = [
+            {r: row, c: col-1}, {r: row, c: col+1},
+            {r: row-1, c: col}, {r: row-1, c: col-1}, {r: row-1, c: col+1},
+            {r: row+1, c: col}, {r: row+1, c: col-1}, {r: row+1, c: col+1}
+        ];
+        
+        let bestDist = Infinity;
+        let bestSlot = {r: row + 1, c: col}; // Default to row below
+        
+        neighbors.forEach(n => {
+            if (n.r >= 0 && n.c >= 0 && n.c < this.cols && !this.getBubbleAt(n.r, n.c)) {
+                const nOffset = (n.r % 2 !== 0) ? this.bubbleRadius : 0;
+                const nx = n.c * this.bubbleDiameter + this.bubbleRadius + nOffset + 15;
+                const ny = n.r * (this.bubbleDiameter * 0.85) + this.bubbleRadius + 180;
+                const dist = Phaser.Math.Distance.Between(x, y, nx, ny);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestSlot = n;
+                }
+            }
+        });
+        row = bestSlot.r;
+        col = bestSlot.c;
+    }
 
+    // Double check row exists
+    if (!this.grid[row]) this.grid[row] = [];
+    
     // Place new bubble in grid
-    const posX = col * this.bubbleDiameter + this.bubbleRadius + offset + 40;
+    const finalOffset = (row % 2 !== 0) ? this.bubbleRadius : 0;
+    const posX = col * this.bubbleDiameter + this.bubbleRadius + finalOffset + 15;
     const posY = row * (this.bubbleDiameter * 0.85) + this.bubbleRadius + 180;
     
     const newBubble = this.createBubbleAt(posX, posY, flavor);
     newBubble.setData('row', row);
     newBubble.setData('col', col);
-
-    if (!this.grid[row]) this.grid[row] = [];
     this.grid[row][col] = newBubble;
 
     this.checkMatches(row, col, flavor);
